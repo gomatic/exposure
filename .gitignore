@@ -1,0 +1,8 @@
+*
+
+!.gitignore
+!.gitmodules
+!*.go
+!*.md
+!LICENSE
+!Makefile
