@@ -21,5 +21,5 @@ $(APP_NAME) $(GOBIN)/$(APP_NAME): $(SOURCES)
 	go build -ldflags="$(LDFLAGS)" -o $@
 
 test: $(APP_NAME)
-	echo hello | tee /dev/stderr | ./exposure conceal alias/secret | tee /dev/stderr | ./exposure reveal
-	date | tee /dev/stderr | ./exposure conceal alias/secret | tee /dev/stderr | ./exposure reveal
+	echo hello | tee /dev/stderr | ./exposure -V -k hello conceal alias/secret | tee /dev/stderr | ./exposure -V -k hello reveal
+	date | tee /dev/stderr | ./exposure -V -k date conceal alias/secret | tee /dev/stderr | ./exposure -V -k date reveal

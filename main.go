@@ -9,12 +9,14 @@ import (
 
 //
 const MAJOR = "1.0"
+
 var VERSION = "1"
 
 //
 type application struct {
-	Bucket string
-	Region string
+	Bucket  string
+	Region  string
+	FileKey string
 	// The positional parameter is key name for this provided value
 	Value string
 	ssh struct {
@@ -24,6 +26,7 @@ type application struct {
 	}
 	Output struct {
 		Debugging bool
+		Verbose   bool
 	}
 }
 
@@ -45,6 +48,16 @@ func main() {
 			EnvVar:      "AWS_REGION",
 			Destination: &settings.Region,
 		},
+		cli.StringFlag{
+			Name:        "key, k",
+			Usage:       "If the input is stdin, provide the key the data represents.",
+			Value:       "",
+			Destination: &settings.FileKey,
+		},
+		cli.BoolFlag{
+			Name:        "verbose, V",
+			Destination: &settings.Output.Verbose,
+		},
 	}
 
 	app.Commands = []cli.Command{
@@ -60,6 +73,7 @@ func main() {
 					Destination: &settings.Value,
 				},
 			},
+			After: verbose,
 		},
 		{
 			Name:      "reveal",
@@ -90,7 +104,14 @@ func main() {
 				}
 				return nil
 			},
+			After: verbose,
 		},
 	}
 	app.Run(os.Args)
+}
+
+//
+func verbose(ctx *cli.Context) error {
+	log.Printf("%+v", settings)
+	return nil
 }

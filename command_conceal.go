@@ -13,6 +13,7 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"path"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
@@ -42,17 +43,38 @@ func getPlainSource(args []string) ([]byte, error) {
 func command_conceal(ctx *cli.Context) error {
 	args := ctx.Args()
 
-	var plaintext []byte
+	var (
+		plaintext []byte
+		file string
+	)
 	if len(args) < 1 {
 		return errors.New("Missing required parameters.")
 	} else if settings.Value != "" {
 		plaintext = []byte(settings.Value)
 	} else {
-		pt, err := getPlainSource(args)
+		var in io.Reader = os.Stdin
+		if len(args) < 2 {
+			if isTTY() {
+				log.Println("source: stdin")
+			}
+		} else {
+			file = args[1]
+			fi, err := os.Open(file)
+			if err != nil {
+				return err
+			}
+			defer fi.Close()
+			in = fi
+		}
+		pt, err := ioutil.ReadAll(in)
 		if err != nil {
 			return err
 		}
 		plaintext = pt
+	}
+
+	if file == "" {
+		file = settings.FileKey
 	}
 
 	keyid := args[0]
@@ -64,13 +86,21 @@ func command_conceal(ctx *cli.Context) error {
 		return err
 	}
 
+	fileName := path.Base(file)
+
 	svckms := kms.New(sess)
 
-	params := &kms.GenerateDataKeyInput{
+	kmsparams := &kms.GenerateDataKeyInput{
 		KeyId:               aws.String(keyid),
 		NumberOfBytes:       aws.Int64(64),
+		EncryptionContext:   map[string]*string{
+			"sourceKey":aws.String(fileName),
+		},
 	}
-	resp, err := svckms.GenerateDataKey(params)
+	if settings.Output.Verbose {
+		log.Printf("%+v", kmsparams)
+	}
+	resp, err := svckms.GenerateDataKey(kmsparams)
 
 	if err != nil {
 		return err
@@ -109,6 +139,7 @@ func command_conceal(ctx *cli.Context) error {
 	cipher64 := base64.StdEncoding.EncodeToString(ciphertext)
 
 	fmt.Println(version)
+	fmt.Println(file)
 	fmt.Println(cipherMAC64)
 	fmt.Println(wrapper64)
 	fmt.Println(cipher64)

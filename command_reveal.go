@@ -13,6 +13,7 @@ import (
 	"net"
 	"net/url"
 	"os"
+	"path"
 	"regexp"
 	"strconv"
 	"strings"
@@ -37,7 +38,7 @@ func command_reveal(ctx *cli.Context) error {
 		return err
 	}
 
-	var file string
+	var file, keyid string
 	var bin *bufio.Reader
 
 	if len(args) < 1 {
@@ -45,6 +46,7 @@ func command_reveal(ctx *cli.Context) error {
 			log.Println("source: stdin")
 		}
 		bin = bufio.NewReader(os.Stdin)
+		file = settings.FileKey
 	} else {
 		file = args[0]
 
@@ -124,14 +126,17 @@ func command_reveal(ctx *cli.Context) error {
 
 	switch major {
 	case "1":
-		return v1(sess, bin, version, major, minor, file)
+		return v1(sess, bin, keyid, version, major, minor, file)
 	}
 
 	return errors.New(fmt.Sprintf("Version %s is not supported", major))
 }
 
 // TODO improve this signature
-func v1(sess *session.Session, bin *bufio.Reader, version, major, minor, file string) error {
+func v1(sess *session.Session, bin *bufio.Reader, keyid, version, major, minor, file string) error {
+	// skip sourceKey
+	bin.ReadString('\n')
+
 	// mac
 	cipherMAC64, err := bin.ReadString('\n')
 	if err != nil {
@@ -160,6 +165,12 @@ func v1(sess *session.Session, bin *bufio.Reader, version, major, minor, file st
 
 	kmsparams := &kms.DecryptInput{
 		CiphertextBlob: wrapper,
+		EncryptionContext:   map[string]*string{
+			"sourceKey":aws.String(path.Base(file)),
+		},
+	}
+	if settings.Output.Verbose {
+		log.Printf("%+v", kmsparams)
 	}
 
 	resp, err := svckms.Decrypt(kmsparams)
